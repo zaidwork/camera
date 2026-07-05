@@ -1,0 +1,25 @@
+services:
+  # Backend Web Service
+  - type: web
+    name: laring-backend
+    env: python
+    buildCommand: pip install -r requirements.txt && python download_models.py
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    rootDir: backend
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+
+  # Frontend Static Site
+  - type: static
+    name: laring-frontend
+    buildCommand: npm install && npm run build
+    publishPath: dist
+    rootDir: frontend
+    envVars:
+      - key: VITE_WS_URL
+        fromService:
+          type: web
+          name: laring-backend
+          property: url
