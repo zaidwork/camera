@@ -429,7 +429,7 @@ async def websocket_endpoint(websocket: WebSocket):
             # 2. Save Suspicious Objects
             for obj in other_detections:
                 obj_label = obj["label"].lower()
-                if obj_label in ["lighter", "ruler"]:
+                if obj_label in ["lighter", "knife", "gun", "pistol", "scissors", "fire", "smoke", "hammer", "screwdriver", "baseball bat"]:
                     alert_msg = f"Suspicious object detected: {obj_label} ({obj['conf']:.2f})"
                     last_saved = last_saved_alerts.get(alert_msg, 0)
                     if current_time - last_saved > 20.0:

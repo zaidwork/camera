@@ -4,7 +4,24 @@ from ultralytics import YOLOWorld
 class ObjectDetector:
     def __init__(self):
         self.model = None
-        self.classes = ["person", "ruler", "lighter", "cell phone", "bottle", "cup", "pen", "scissors", "book"]
+        self.classes = [
+            "person", 
+            "knife", 
+            "gun", 
+            "pistol", 
+            "scissors", 
+            "lighter", 
+            "fire", 
+            "smoke", 
+            "hammer", 
+            "screwdriver", 
+            "baseball bat", 
+            "cell phone", 
+            "bottle", 
+            "cup", 
+            "pen", 
+            "book"
+        ]
         
         try:
             print("Loading YOLO-World model...")

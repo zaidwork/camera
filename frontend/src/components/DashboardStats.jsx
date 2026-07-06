@@ -37,7 +37,15 @@ const DashboardStats = ({ peopleCount, objects, alerts, logs }) => {
       'cup': 'كوب',
       'pen': 'قلم',
       'scissors': 'مقص',
-      'book': 'كتاب'
+      'book': 'كتاب',
+      'knife': 'سكين/سلاح أبيض',
+      'gun': 'سلاح ناري',
+      'pistol': 'مسدس',
+      'fire': 'نيران/حريق',
+      'smoke': 'دخان',
+      'hammer': 'مطرقة/شاكوش',
+      'screwdriver': 'مفك براغي',
+      'baseball bat': 'مضرب بيسبول'
     };
     return dict[name.toLowerCase()] || name;
   };
@@ -95,7 +103,7 @@ const DashboardStats = ({ peopleCount, objects, alerts, logs }) => {
         ) : (
           <div className="flex flex-wrap gap-2" style={{ padding: '8px 0' }}>
             {objects.map((obj, idx) => {
-              const isFlagged = ["lighter", "ruler"].includes(obj.toLowerCase());
+              const isFlagged = ["lighter", "scissors", "knife", "gun", "pistol", "fire", "smoke", "hammer", "screwdriver", "baseball bat"].includes(obj.toLowerCase());
               return (
                 <span 
                   key={idx} 
