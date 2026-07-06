@@ -1,0 +1,7 @@
+# Netlify Configuration File
+# This file automates the build settings when deploying to Netlify.
+
+[build]
+  base = "frontend"
+  publish = "dist"
+  command = "npm install && npm run build"
