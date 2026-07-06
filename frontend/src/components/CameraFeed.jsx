@@ -7,6 +7,11 @@ const CameraFeed = ({ onMetadataReceived, wsUrl = "ws://localhost:8000/ws" }) =>
   const [errorMsg, setErrorMsg] = useState("");
   const [fps, setFps] = useState(0);
 
+  // Camera devices and pacing
+  const [devices, setDevices] = useState([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState('');
+  const isProcessingRef = useRef(false);
+
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const wsRef = useRef(null);
@@ -19,10 +24,25 @@ const CameraFeed = ({ onMetadataReceived, wsUrl = "ws://localhost:8000/ws" }) =>
 
   const [processedImgSrc, setProcessedImgSrc] = useState(null);
 
+  const getDevices = async () => {
+    try {
+      const allDevices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = allDevices.filter(device => device.kind === 'videoinput');
+      setDevices(videoDevices);
+      if (videoDevices.length > 0 && !selectedDeviceId) {
+        setSelectedDeviceId(videoDevices[0].deviceId);
+      }
+    } catch (err) {
+      console.error("Error listing cameras:", err);
+    }
+  };
+
   useEffect(() => {
     canvasRef.current = document.createElement('canvas');
     canvasRef.current.width = 640;
     canvasRef.current.height = 480;
+
+    getDevices();
 
     return () => {
       stopCamera();
@@ -60,6 +80,10 @@ const CameraFeed = ({ onMetadataReceived, wsUrl = "ws://localhost:8000/ws" }) =>
             frameCountRef.current = 0;
             fpsTimeRef.current = now;
           }
+
+          // Unlock frame-processing and schedule next frame
+          isProcessingRef.current = false;
+          requestRef.current = requestAnimationFrame(processLoop);
         } else if (data.type === "game_update") {
           onMetadataReceived({ game: data.game });
         }
@@ -90,10 +114,16 @@ const CameraFeed = ({ onMetadataReceived, wsUrl = "ws://localhost:8000/ws" }) =>
   const startCamera = async () => {
     try {
       setErrorMsg("");
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480, frameRate: { max: 15 } },
+      const constraints = {
+        video: { 
+          width: 640, 
+          height: 480, 
+          frameRate: { max: 15 },
+          deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined
+        },
         audio: false
-      });
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       
       streamRef.current = stream;
       if (videoRef.current) {
@@ -105,8 +135,12 @@ const CameraFeed = ({ onMetadataReceived, wsUrl = "ws://localhost:8000/ws" }) =>
       lastFrameTimeRef.current = performance.now();
       fpsTimeRef.current = performance.now();
       frameCountRef.current = 0;
+      isProcessingRef.current = false;
       
       requestRef.current = requestAnimationFrame(processLoop);
+
+      // Refresh devices to get labels
+      setTimeout(getDevices, 500);
     } catch (err) {
       console.error("Failed to access camera:", err);
       setErrorMsg("تم رفض الوصول إلى كاميرا الويب. يرجى السماح بالوصول للكاميرا من إعدادات المتصفح.");
@@ -132,38 +166,40 @@ const CameraFeed = ({ onMetadataReceived, wsUrl = "ws://localhost:8000/ws" }) =>
     }
     setIsConnected(false);
     setFps(0);
+    isProcessingRef.current = false;
   };
 
-  const processLoop = (timestamp) => {
+  const processLoop = () => {
     if (!videoRef.current || !canvasRef.current || !wsRef.current) {
-      requestRef.current = requestAnimationFrame(processLoop);
       return;
     }
 
-    const elapsed = timestamp - lastFrameTimeRef.current;
-
-    if (elapsed >= fpsIntervalRef.current) {
-      lastFrameTimeRef.current = timestamp - (elapsed % fpsIntervalRef.current);
-
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-
-      if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const base64Img = canvas.toDataURL('image/jpeg', 0.6);
-        
-        if (wsRef.current.readyState === WebSocket.OPEN) {
-          const payload = {
-            action: "process_frame",
-            image: base64Img
-          };
-          wsRef.current.send(JSON.stringify(payload));
-        }
-      }
+    if (isProcessingRef.current) {
+      return;
     }
 
-    requestRef.current = requestAnimationFrame(processLoop);
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      isProcessingRef.current = true;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const base64Img = canvas.toDataURL('image/jpeg', 0.6);
+      
+      if (wsRef.current.readyState === WebSocket.OPEN) {
+        const payload = {
+          action: "process_frame",
+          image: base64Img
+        };
+        wsRef.current.send(JSON.stringify(payload));
+      } else {
+        isProcessingRef.current = false;
+        requestRef.current = requestAnimationFrame(processLoop);
+      }
+    } else {
+      requestRef.current = requestAnimationFrame(processLoop);
+    }
   };
 
   const sendGameAction = (action, payload = {}) => {
@@ -233,24 +269,43 @@ const CameraFeed = ({ onMetadataReceived, wsUrl = "ws://localhost:8000/ws" }) =>
         )}
       </div>
 
-      <div className="flex gap-4 mt-2" style={{ justifyContent: 'center' }}>
-        {!isActive ? (
-          <button 
-            onClick={startCamera} 
-            className="cyber-btn"
-          >
-            <Camera className="w-4 h-4" />
-            تشغيل الكاميرا
-          </button>
-        ) : (
-          <button 
-            onClick={stopCamera} 
-            className="cyber-btn cyber-btn-magenta"
-          >
-            <CameraOff className="w-4 h-4" />
-            إيقاف الكاميرا
-          </button>
+      <div className="flex-col gap-3 mt-2" style={{ alignItems: 'center', width: '100%' }}>
+        {devices.length > 1 && !isActive && (
+          <div className="flex gap-2 items-center justify-center mb-2" dir="rtl">
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>اختر الكاميرا المتاحة:</span>
+            <select
+              value={selectedDeviceId}
+              onChange={(e) => setSelectedDeviceId(e.target.value)}
+              className="bg-black/80 border border-cyan-500/30 text-cyan-400 rounded px-3 py-1 text-xs outline-none cyber-font cursor-pointer"
+              style={{ maxWidth: '240px' }}
+            >
+              {devices.map(device => (
+                <option key={device.deviceId} value={device.deviceId}>
+                  {device.label || `كاميرا ${device.deviceId.slice(0, 5)}`}
+                </option>
+              ))}
+            </select>
+          </div>
         )}
+
+        <div className="flex gap-4" style={{ justifyContent: 'center', width: '100%' }}>
+          {!isActive ? (
+            <button 
+              onClick={startCamera} 
+              className="cyber-btn"
+            >
+              <Camera className="w-4 h-4" />
+              تشغيل الكاميرا
+            </button>
+          ) : (
+            <button 
+              onClick={stopCamera} 
+              className="cyber-btn cyber-btn-magenta"
+            >
+              <CameraOff className="w-4 h-4" />
+              إيقاف الكاميرا
+            </button>
+          )}
         
         {isActive && !isConnected && (
           <button 
@@ -263,6 +318,7 @@ const CameraFeed = ({ onMetadataReceived, wsUrl = "ws://localhost:8000/ws" }) =>
         )}
       </div>
     </div>
+  </div>
   );
 };
 

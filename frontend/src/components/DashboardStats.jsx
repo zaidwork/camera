@@ -2,11 +2,11 @@ import React, { useEffect, useRef } from 'react';
 import { Users, Shield, ShieldAlert, Package, Clock, Zap } from 'lucide-react';
 
 const DashboardStats = ({ peopleCount, objects, alerts, logs }) => {
-  const logEndRef = useRef(null);
+  const logContainerRef = useRef(null);
 
   useEffect(() => {
-    if (logEndRef.current) {
-      logEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
   }, [logs]);
 
@@ -131,7 +131,7 @@ const DashboardStats = ({ peopleCount, objects, alerts, logs }) => {
           سجل الأحداث والتشخيص المباشر
         </h3>
         
-        <div className="flex-1" style={{ overflowY: 'auto', paddingLeft: '4px', display: 'flex', flexDirection: 'column', gap: '8px', fontFamily: 'monospace', fontSize: '11px', textAlign: 'right' }}>
+        <div ref={logContainerRef} className="flex-1" style={{ overflowY: 'auto', paddingLeft: '4px', display: 'flex', flexDirection: 'column', gap: '8px', fontFamily: 'monospace', fontSize: '11px', textAlign: 'right' }}>
           {logs.length === 0 ? (
             <div className="flex-1 flex-center" style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
               بانتظار البيانات... قم بتشغيل الكاميرا لبدء عرض الأحداث.
@@ -155,7 +155,6 @@ const DashboardStats = ({ peopleCount, objects, alerts, logs }) => {
               );
             })
           )}
-          <div ref={logEndRef} />
         </div>
       </div>
     </div>
