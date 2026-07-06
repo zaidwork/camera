@@ -84,7 +84,7 @@ class FaceAnalyzer:
                 try:
                     gray_crop = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY)
                     gray_crop = cv2.resize(gray_crop, (64, 64))
-                    blob = cv2.dnn.blobFromImage(gray_crop, size=(64, 64), colorSpace=None)
+                    blob = cv2.dnn.blobFromImage(gray_crop, 1.0, (64, 64))
                     self.emotion_net.setInput(blob)
                     emotion_preds = self.emotion_net.forward()
                     analysis["emotion"] = self.emotion_list[emotion_preds[0].argmax()]
