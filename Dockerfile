@@ -22,6 +22,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy all backend files
 COPY backend/ .
 
+# Download AI/MediaPipe models
+RUN python download_models.py
+
 # Expose port (Hugging Face Spaces uses 7860 by default)
 EXPOSE 7860
 
