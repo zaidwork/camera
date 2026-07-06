@@ -18,6 +18,7 @@ const CameraFeed = ({ onMetadataReceived, wsUrl = "ws://localhost:8000/ws" }) =>
   const streamRef = useRef(null);
   const requestRef = useRef(null);
   const lastFrameTimeRef = useRef(0);
+  const lastFrameSentTimeRef = useRef(0);
   const fpsIntervalRef = useRef(1000 / 12);
   const frameCountRef = useRef(0);
   const fpsTimeRef = useRef(0);
@@ -174,7 +175,14 @@ const CameraFeed = ({ onMetadataReceived, wsUrl = "ws://localhost:8000/ws" }) =>
       return;
     }
 
+    const now = performance.now();
+    // If we've been waiting for a response for more than 450ms, force unlock to prevent freeze
+    if (isProcessingRef.current && (now - lastFrameSentTimeRef.current > 450)) {
+      isProcessingRef.current = false;
+    }
+
     if (isProcessingRef.current) {
+      requestRef.current = requestAnimationFrame(processLoop);
       return;
     }
 
@@ -184,6 +192,7 @@ const CameraFeed = ({ onMetadataReceived, wsUrl = "ws://localhost:8000/ws" }) =>
 
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
       isProcessingRef.current = true;
+      lastFrameSentTimeRef.current = performance.now();
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const base64Img = canvas.toDataURL('image/jpeg', 0.6);
       
@@ -246,12 +255,19 @@ const CameraFeed = ({ onMetadataReceived, wsUrl = "ws://localhost:8000/ws" }) =>
       )}
 
       {/* Video stream rendering */}
-      <div className="video-container">
+      <div className="video-container" style={{ position: 'relative', width: '100%', height: '360px', backgroundColor: '#000', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
         <video 
           ref={videoRef} 
-          style={{ display: 'none' }} 
+          style={{ display: (isActive && !processedImgSrc) ? 'block' : 'none', width: '100%', height: '100%', objectFit: 'cover' }} 
           autoPlay 
           playsInline
+          muted
         />
 
         {processedImgSrc ? (
@@ -260,11 +276,16 @@ const CameraFeed = ({ onMetadataReceived, wsUrl = "ws://localhost:8000/ws" }) =>
             alt="AI Processed Stream" 
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
-        ) : (
+        ) : !isActive ? (
           <div className="flex-col flex-center gap-3 text-center p-3" style={{ color: 'var(--text-secondary)' }}>
             <CameraOff className="w-12 h-12 stroke-1 opacity-50 mb-2" />
             <p style={{ fontSize: '1rem', fontWeight: 600 }}>محرك المعالجة البيومترية غير نشط.</p>
             <p style={{ fontSize: '11px', maxWidth: '320px', opacity: 0.7 }}>يرجى تفعيل بث الكاميرا من الزر في الأسفل لتشغيل المعالجة والتحليل الذاتي للغرفة في الوقت الفعلي.</p>
+          </div>
+        ) : (
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#00f0ff', zIndex: 10 }}>
+            <div style={{ width: '32px', height: '32px', border: '3px solid rgba(0,240,255,0.2)', borderTopColor: '#00f0ff', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '8px' }}></div>
+            <p className="cyber-font" style={{ fontSize: '11px' }}>جاري تحميل معالجة الذكاء الاصطناعي...</p>
           </div>
         )}
       </div>
